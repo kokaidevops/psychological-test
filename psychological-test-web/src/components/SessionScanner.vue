@@ -43,7 +43,7 @@
               </div>
 
               <!-- Status -->
-              <div class="absolute top-3 left-3 bg-bg/80 backdrop-blur px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-2">
+              <div class="absolute top-3 left-3 bg-bg/80 backdrop-blur px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-2 z-10">
                 <span class="w-1.5 h-1.5 rounded-full bg-accent2 live-dot"></span>
                 <span>{{ isScanning ? 'Mencari barcode...' : 'Kamera mati' }}</span>
               </div>
@@ -53,7 +53,7 @@
               <button 
                 @click="startCamera" 
                 :disabled="isScanning"
-                class="flex-1 py-3 text-sm font-medium bg-fg text-bg rounded-full hover:bg-accent transition-colors disabled:opacity-50"
+                class="flex-1 py-3 text-sm font-medium bg-fg text-bg rounded-full hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {{ isScanning ? 'Memindai...' : 'Aktifkan Kamera' }}
               </button>
@@ -91,9 +91,15 @@
           </div>
 
           <!-- Error Message -->
-          <div v-if="errorMessage" class="mt-4 p-3 bg-accent/10 border border-accent/20 rounded-lg text-sm text-accent flex items-start gap-2">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="mt-0.5 shrink-0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-            <span>{{ errorMessage }}</span>
+          <div v-if="errorMessage" class="mt-4 p-4 bg-accent/10 border border-accent/20 rounded-lg text-sm text-accent flex items-start gap-3">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="mt-0.5 shrink-0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <div>
+              <strong class="block mb-1">Gagal mengakses kamera</strong>
+              <span>{{ errorMessage }}</span>
+              <button @click="switchMode('upload')" class="block mt-2 text-xs underline hover:text-fg">
+                Beralih ke mode Unggah File
+              </button>
+            </div>
           </div>
 
           <!-- Manual Input Fallback -->
@@ -122,11 +128,11 @@
 
 <script setup>
 import { ref, onUnmounted } from 'vue'
-import { BrowserMultiFormatReader } from '@zxing/library'
+import { BrowserMultiFormatReader, NotFoundException } from '@zxing/library'
 import { useAssessmentStore } from '@/stores/assessment'
 
 const store = useAssessmentStore()
-const mode = ref('scan') // 'scan' or 'upload'
+const mode = ref('scan')
 const videoRef = ref(null)
 const isScanning = ref(false)
 const isDecoding = ref(false)
@@ -137,48 +143,65 @@ const manualToken = ref('')
 const reader = new BrowserMultiFormatReader()
 let controls = null
 
-// Start Camera Scan
 async function startCamera() {
   errorMessage.value = ''
+  stopCamera() // Bersihkan instance sebelumnya jika ada
+  isScanning.value = true
+
   try {
-    isScanning.value = true
-    controls = await reader.decodeFromVideoDevice(
-      { video: videoRef.value },
-      (result, err) => {
-        if (result) {
-          handleToken(result.getText())
-          stopCamera()
-        }
+    // Gunakan constraints untuk eksplisit meminta izin dan kamera belakang
+    const constraints = {
+      video: { facingMode: 'environment' }
+    }
+
+    controls = await reader.decodeFromConstraints(constraints, videoRef.value, (result, err) => {
+      if (result) {
+        handleToken(result.getText())
+        stopCamera()
       }
-    )
+      // Abaikan error NotFoundException karena wajar terjadi setiap frame saat barcode belum ketemu
+      if (err && !(err instanceof NotFoundException)) {
+        console.warn(err)
+      }
+    })
   } catch (err) {
     isScanning.value = false
-    errorMessage.value = 'Tidak dapat mengakses kamera. Pastikan izin kamera diberikan atau coba mode unggah file.'
+    
+    // Penanganan error spesifik untuk izin kamera
+    if (err instanceof DOMException) {
+      if (err.name === 'NotAllowedError' || err.name === 'SecurityError') {
+        errorMessage.value = 'Izin kamera ditolak. Silakan berikan izin kamera pada pengaturan browser Anda (klik ikon kamera di address bar).'
+      } else if (err.name === 'NotFoundError' || err.name === 'OverconstrainedError') {
+        errorMessage.value = 'Tidak ada kamera yang terdeteksi di perangkat ini. Silakan gunakan fitur Unggah File.'
+      } else if (err.name === 'NotReadableError') {
+        errorMessage.value = 'Kamera sedang digunakan oleh aplikasi lain. Tutup aplikasi tersebut lalu coba lagi.'
+      } else {
+        errorMessage.value = `Terjadi kesalahan: ${err.message}`
+      }
+    } else {
+      // Jika diakses via HTTP selain localhost
+      errorMessage.value = 'Gagal memulai kamera. Pastikan website diakses via HTTPS atau localhost.'
+    }
   }
 }
 
 function stopCamera() {
   if (controls) {
     controls.stop()
+    controls = null
     isScanning.value = false
   }
 }
 
-// Handle File Upload
 async function handleFileUpload(event) {
   const file = event.target.files[0]
-  if (file) {
-    await decodeImage(file)
-  }
+  if (file) await decodeImage(file)
 }
 
-// Handle Drag & Drop
 async function handleDrop(event) {
   isDragging.value = false
   const file = event.dataTransfer.files[0]
-  if (file) {
-    await decodeImage(file)
-  }
+  if (file) await decodeImage(file)
 }
 
 async function decodeImage(file) {
@@ -194,20 +217,24 @@ async function decodeImage(file) {
       const result = await readerInstance.decodeFromImageElement(img)
       handleToken(result.getText())
     } catch (err) {
-      errorMessage.value = 'Barcode tidak terdeteksi dalam gambar. Pastikan gambar jelas dan tidak terpotong.'
+      errorMessage.value = 'Barcode tidak terdeteksi dalam gambar. Pastikan gambar jelas, tidak buram, dan tidak terpotong.'
     } finally {
       isDecoding.value = false
+      URL.revokeObjectURL(img.src)
     }
+  }
+  
+  img.onerror = () => {
+    errorMessage.value = 'Gagal memuat file gambar. Pastikan format file benar (PNG/JPG).'
+    isDecoding.value = false
   }
 }
 
-// Token Handling
 function handleToken(token) {
-  // Simulasi validasi token (di production, lakukan API call ke backend)
   if (token && token.length >= 8) {
     store.setSessionToken(token)
   } else {
-    errorMessage.value = 'Format token tidak valid.'
+    errorMessage.value = 'Format token tidak valid. Token harus minimal 8 karakter.'
   }
 }
 

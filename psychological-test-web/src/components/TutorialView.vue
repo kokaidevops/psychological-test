@@ -25,11 +25,11 @@
         </nav>
 
         <div class="mt-8 p-5 bg-card border border-border rounded-xl">
-          <div class="text-xs text-muted">Butuh bantuan teknis?</div>
-          <div class="font-display text-lg mt-1 mb-3">Hubungi Support</div>
-          <button class="w-full py-2.5 text-xs bg-fg text-bg rounded-full hover:bg-accent transition-colors">
-            Live Chat
-          </button>
+          <div class="text-xs text-muted">Butuh bantuan?</div>
+          <div class="font-display text-lg mt-1 mb-3">Hubungi Tim Kami</div>
+          <a href="https://wa.me/6281232578168" class="px-4 w-full py-2.5 text-xs bg-fg text-bg rounded-full hover:bg-accent transition-colors">
+            WhatsApp Message
+          </a>
         </div>
       </div>
     </aside>

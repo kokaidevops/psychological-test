@@ -12,7 +12,7 @@
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-accent"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
           </div>
           <h3 class="font-display text-lg font-medium mb-2">Perangkat & Browser</h3>
-          <p class="text-sm text-muted leading-relaxed">Gunakan laptop atau desktop dengan browser modern (Chrome, Edge, Safari). Hindari mengakses via ponsel agar antarmuka soal terlihat optimal.</p>
+          <p class="text-sm text-muted leading-relaxed">Gunakan laptop, desktop, ataupun ponsel dengan browser modern (Chrome, Edge, Safari). Antarmuka platform kami telah dioptimalkan agar sesuai dengan device yang digunakan.</p>
         </div>
         <div class="bg-card border border-border rounded-2xl p-6 transition-all hover:border-fg hover:-translate-y-0.5">
           <div class="w-10 h-10 rounded-lg bg-accent2/10 flex items-center justify-center mb-4">

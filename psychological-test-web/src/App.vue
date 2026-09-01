@@ -1,9 +1,5 @@
 <template>
   <div class="min-h-screen flex flex-col">
-    <div class="fixed top-0 left-0 right-0 h-0.75 bg-border z-50">
-      <div class="h-full bg-accent transition-all duration-800 ease-out" style="width: 42%"></div>
-    </div>
-    
     <AppHeader />
     <main class="max-w-7xl mx-auto px-6 lg:px-10 flex-1">
       <RouterView v-slot="{ Component }">

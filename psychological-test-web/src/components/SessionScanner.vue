@@ -102,24 +102,6 @@
             </div>
           </div>
 
-          <!-- Manual Input Fallback -->
-          <div class="mt-6 pt-6 border-t border-border">
-            <div class="text-xs text-muted mb-2">Atau masukkan token manual:</div>
-            <div class="flex gap-2">
-              <input 
-                v-model="manualToken" 
-                type="text" 
-                placeholder="Masukkan 12 karakter token..."
-                class="flex-1 px-4 py-2.5 bg-subtle border border-border rounded-lg text-sm focus:outline-none focus:border-fg font-mono"
-              />
-              <button 
-                @click="submitManualToken" 
-                class="px-5 py-2.5 text-sm font-medium bg-fg text-bg rounded-lg hover:bg-accent transition-colors"
-              >
-                Verifikasi
-              </button>
-            </div>
-          </div>
         </div>
       </div>
     </div>
@@ -127,7 +109,7 @@
 </template>
 
 <script setup>
-import { ref, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { BrowserMultiFormatReader, NotFoundException } from '@zxing/library'
 import { useAssessmentStore } from '@/stores/assessment'
 
@@ -143,31 +125,48 @@ const manualToken = ref('')
 const reader = new BrowserMultiFormatReader()
 let controls = null
 
+// Fungsi untuk mematikan kamera secara paksa dan menyeluruh
+function hardStopCamera() {
+  if (controls) {
+    controls.stop()
+    controls = null
+  }
+  
+  // Pastikan stream video dimatikan hingga ke level hardware
+  if (videoRef.value && videoRef.value.srcObject) {
+    const stream = videoRef.value.srcObject
+    const tracks = stream.getTracks()
+    tracks.forEach(track => track.stop()) // Mematikan hardware kamera
+    videoRef.value.srcObject = null
+  }
+  
+  isScanning.value = false
+}
+
 async function startCamera() {
   errorMessage.value = ''
-  stopCamera() // Bersihkan instance sebelumnya jika ada
+  hardStopCamera() // Bersihkan instance sebelumnya jika ada
   isScanning.value = true
 
   try {
-    // Gunakan constraints untuk eksplisit meminta izin dan kamera belakang
     const constraints = {
       video: { facingMode: 'environment' }
     }
 
     controls = await reader.decodeFromConstraints(constraints, videoRef.value, (result, err) => {
       if (result) {
+        // 1. Matikan kamera TERLEBIH DAHULU sebelum state berubah
+        hardStopCamera()
+        // 2. Baru kirim token untuk mengganti halaman
         handleToken(result.getText())
-        stopCamera()
       }
-      // Abaikan error NotFoundException karena wajar terjadi setiap frame saat barcode belum ketemu
       if (err && !(err instanceof NotFoundException)) {
         console.warn(err)
       }
     })
   } catch (err) {
-    isScanning.value = false
+    hardStopCamera()
     
-    // Penanganan error spesifik untuk izin kamera
     if (err instanceof DOMException) {
       if (err.name === 'NotAllowedError' || err.name === 'SecurityError') {
         errorMessage.value = 'Izin kamera ditolak. Silakan berikan izin kamera pada pengaturan browser Anda (klik ikon kamera di address bar).'
@@ -179,19 +178,32 @@ async function startCamera() {
         errorMessage.value = `Terjadi kesalahan: ${err.message}`
       }
     } else {
-      // Jika diakses via HTTP selain localhost
       errorMessage.value = 'Gagal memulai kamera. Pastikan website diakses via HTTPS atau localhost.'
     }
   }
 }
 
 function stopCamera() {
-  if (controls) {
-    controls.stop()
-    controls = null
-    isScanning.value = false
+  hardStopCamera()
+}
+
+// Auto-pause jika user berpindah tab atau minimize browser (Menghemat baterai & privasi)
+const handleVisibilityChange = () => {
+  if (document.hidden && isScanning.value) {
+    hardStopCamera()
   }
 }
+
+onMounted(() => {
+  document.addEventListener('visibilitychange', handleVisibilityChange)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
+  hardStopCamera() // Pastikan kamera mati saat komponen dihancurkan
+})
+
+// ... (Sisa fungsi upload dan manual input tetap sama persis seperti kode sebelumnya)
 
 async function handleFileUpload(event) {
   const file = event.target.files[0]
@@ -249,12 +261,8 @@ function submitManualToken() {
 function switchMode(m) {
   mode.value = m
   errorMessage.value = ''
-  if (m === 'upload') stopCamera()
+  if (m === 'upload') hardStopCamera()
 }
-
-onUnmounted(() => {
-  stopCamera()
-})
 </script>
 
 <style scoped>

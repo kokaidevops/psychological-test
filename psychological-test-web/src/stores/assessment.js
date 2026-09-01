@@ -8,6 +8,7 @@ export const useAssessmentStore = defineStore('assessment', () => {
   const flagged = ref([]) // Array of questionIds
   const sessionToken = ref(null)
   const isSessionActive = ref(false)
+  const user = ref("")
   
   // Mock Data (10 pertanyaan untuk demo)
   const questions = ref([

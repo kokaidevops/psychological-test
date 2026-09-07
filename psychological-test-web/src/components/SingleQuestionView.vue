@@ -178,7 +178,7 @@
         </button>
 
         <button 
-          @click="store.stopSessionTest(store.currentTestData.session_test_id)" 
+          @click="stopSessionTest" 
           v-else
           class="inline-flex items-center gap-2.5 px-5 py-3 text-sm bg-fg text-bg rounded-full hover:bg-accent transition-all disabled:opacity-30 disabled:cursor-not-allowed"
         >
@@ -201,6 +201,15 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('online', handleOnline);
 });
+
+async function stopSessionTest() {
+  const isSuccess = store.stopSessionTest(store.currentTestData.session_test_id)
+  if (!isSuccess) {
+    showError('Gagal Menyelesaikan Tes')
+  } else {
+    router.push('/beranda')
+  }
+}
 
 const handleOnline = () => {
   store.flushPendingDrafts();

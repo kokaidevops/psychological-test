@@ -110,7 +110,7 @@ async function startTest(testId) {
   if(testId) {
     const isSuccess = await store.startSessionTest(testId)
     if (!isSuccess) {
-      showError(store.errorMessage || 'ID Tes tidak ditemukan!.')
+      showError('ID Tes tidak ditemukan!.')
     } else {
       router.push('/asesmen')
     }
@@ -123,7 +123,7 @@ async function resumeTest(testId) {
   if(testId) {
     const isSuccess = await store.resumeSessionTest(testId)
     if (!isSuccess) {
-      showError(store.errorMessage || 'ID Tes tidak ditemukan!.')
+      showError('ID Tes tidak ditemukan!.')
     } else {
       router.push('/asesmen')
     }
@@ -136,7 +136,7 @@ async function stopTest(testId) {
   if(testId) {
     const isSuccess = await store.stopSessionTest(testId)
     if (!isSuccess) {
-      showError(store.errorMessage || 'ID Tes tidak ditemukan!.')
+      showError('ID Tes tidak ditemukan!.')
     } else {
       router.push('/')
     }

@@ -187,7 +187,7 @@
         </button>
 
         <button 
-          @click="store.stopSessionTest()" 
+          @click="store.stopSessionTest(store.currentTestId)" 
           v-else
           class="inline-flex items-center gap-2.5 px-5 py-3 text-sm bg-fg text-bg rounded-full hover:bg-accent transition-all disabled:opacity-30 disabled:cursor-not-allowed"
         >

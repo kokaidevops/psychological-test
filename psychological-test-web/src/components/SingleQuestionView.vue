@@ -192,8 +192,11 @@
 
 <script setup>
 import { onMounted, onUnmounted, computed } from 'vue';
+import { useRouter } from 'vue-router'
 import { useAssessmentStore } from '../stores/assessment'
+
 const store = useAssessmentStore()
+const router = useRouter()
 
 onMounted(() => {
   window.addEventListener('online', handleOnline);

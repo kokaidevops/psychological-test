@@ -64,9 +64,11 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useAssessmentStore } from '../stores/assessment'
+import { useRouter } from 'vue-router'
 import QuestionCard from './QuestionCard.vue'
 import SingleQuestionView from './SingleQuestionView.vue'
 
+const router = useRouter()
 const store = useAssessmentStore()
 
 async function refreshPage() {

@@ -46,7 +46,7 @@
 
       <div class="flex mt-3 justify-end">
         <button 
-          @click="store.stopSessionTest(store.currentTestId)" 
+          @click="store.stopSessionTest(store.currentTestData.session_test_id)" 
           class="inline-flex items-center gap-2.5 px-5 py-3 text-sm bg-fg text-bg rounded-full hover:bg-accent transition-all disabled:opacity-30 disabled:cursor-not-allowed"
         >
           <span>Selesai</span>

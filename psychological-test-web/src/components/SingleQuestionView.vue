@@ -116,15 +116,6 @@
                   ]">{{ opt.name }}</span>
                 </button>
 
-                <div class="save-status" v-if="store.isSaving">
-                  <span class="spinner"></span> Menyimpan jawaban...
-                </div>
-                <div class="save-status offline" v-else-if="store.isOffline">
-                  ⚠️ Koneksi terputus, jawaban tersimpan secara lokal
-                </div>
-                <div class="save-status saved" v-else>
-                  ✅ Tersimpan
-                </div>
               </div>
             </div>
 

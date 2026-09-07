@@ -50,7 +50,7 @@ export const useAssessmentStore = defineStore('assessment', () => {
   const totalQuestions = computed(() => questions.value.length)
   const answeredCount = computed(() => Object.keys(answers.value).length)
   const currentQuestion = computed(() => questions.value[currentQuestionIndex.value])
-  const estimatedTime = computed(() => tests.value?.reduce((acc, test) => acc + test.item, 0) || 0)
+  const estimatedTime = computed(() => tests.value?.reduce((acc, test) => acc + test.time, 0) || 0)
 
   const isSaving = ref(false)
   const isOffline = ref(false)

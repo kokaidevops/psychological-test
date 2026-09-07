@@ -64,7 +64,7 @@ const startSessionSchema = z.object({
 });
 
 const saveDraftSchema = z.object({
-  session_test_id: z.string().min(1),
+  question_id: z.string().min(1),
   answer_id: z.number().int().nullable().optional(),
 });
 

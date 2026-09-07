@@ -254,17 +254,19 @@ async function stopSession(req, res) {
     for (const [questionId, answerId] of Object.entries(drafts)) {
       const existing = await trx('psychological_session_answers as psa')
         .leftJoin('question_tests as qt', 'qt.question_id', 'psa.question_id')
+        .leftJoin('psychological_session_tests as pst', 'pst.test_id', 'psa.test_id')
         .where({ 
-          'psa.session_test_id': sessionTestId, 
+          'pst.id': sessionTestId, 
           'qt.id': questionId 
         })
         .first();
 
       if (existing) {
-        await trx('psychological_session_answers')
+        await trx('psychological_session_answers as psa')
           .leftJoin('question_tests as qt', 'qt.question_id', 'psa.question_id')
+          .leftJoin('psychological_session_tests as pst', 'pst.test_id', 'psa.test_id')
           .where({ 
-            'psa.session_test_id': sessionTestId, 
+            'pst.id': sessionTestId, 
             'qt.id': questionId 
           })
           .update({
@@ -277,11 +279,15 @@ async function stopSession(req, res) {
           .first();
         
         if(question) {
+          const session = await db('psychological_session_tests as pst')
+            .where({ 'pst.id': sessionTestId })
+            .select('pst.session_id', 'pst.session_test_id')
+            .first()
           await trx('psychological_session_answers').insert({
-            session_id: sessionId,
-            session_test_id: sessionTestId,
+            session_id: session.session_id,
+            session_test_id: session.session_test_id,
             test_id: sessionTest.test_id,
-            question_id: question.id,
+            question_id: question.question_id,
             answer_id: answerId && answerId !== '' ? Number(answerId) : null,
           });
         }
@@ -369,8 +375,14 @@ async function resumeSession(req, res) {
       }
     }
 
-    const sessionTest = await db('psychological_session_tests')
-      .where({ session_test_id: sessionTestId, session_id: sessionId })
+    const sessionTest = await db('psychological_session_tests as pst')
+      .leftJoin('psychological_tests as pt', 'pst.test_id', 'pt.test_id')
+      .leftJoin('psychological_sessions as ps', 'pst.session_id', 'ps.session_id')
+      .select('pst.*', 'pt.name as test_name')
+      .where({
+        'ps.id': sessionId,
+        'pst.id': sessionTestId
+      })
       .first();
 
     if (!sessionTest) {
@@ -446,9 +458,12 @@ async function resumeSession(req, res) {
       success: true,
       data: {
         session_test_id: sessionTestId,
+        test_name: sessionTest.test_name,
         test_id: sessionTest.test_id,
         start_time: meta.start_time,
         limit_time: meta.limit_time,
+        time: sessionTest.time,
+        state: sessionTest.state,
         remaining_seconds: Math.max(0, Math.floor((new Date(meta.limit_time).getTime() - Date.now()) / 1000)),
         questions: groupedQuestions,
         drafts, // { questionId: answerId }

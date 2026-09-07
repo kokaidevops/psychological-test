@@ -203,7 +203,7 @@ onUnmounted(() => {
 });
 
 async function stopSessionTest() {
-  const isSuccess = store.stopSessionTest(store.currentTestData.session_test_id)
+  const isSuccess = await store.stopSessionTest(store.currentTestData.session_test_id)
   if (!isSuccess) {
     showError('Gagal Menyelesaikan Tes')
   } else {

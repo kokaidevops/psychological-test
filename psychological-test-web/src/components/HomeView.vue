@@ -24,7 +24,7 @@
             <div class="text-[10px] uppercase tracking-[0.2em] text-muted mb-2">Dalam sesi ini</div>
             <h2 class="font-display text-3xl lg:text-4xl font-light">Tahapan asesmen</h2>
           </div>
-          <div class="text-sm text-muted">{{ store.totalTest }} instrumen · estimasi total {{ store.estimatedTime }} menit</div>
+          <div class="text-sm text-muted">{{ store.totalTests }} instrumen · estimasi total {{ store.estimatedTime }} menit</div>
         </div>
         
         <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-4 min-w-full">

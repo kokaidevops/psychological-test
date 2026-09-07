@@ -82,7 +82,7 @@
             </div>
           </div>
 
-          <div v-if="errorMessage" class="mt-4 p-4 bg-accent/10 border border-accent/20 rounded-lg text-sm text-accent flex items-start gap-3">
+          <!-- <div v-if="errorMessage" class="mt-4 p-4 bg-accent/10 border border-accent/20 rounded-lg text-sm text-accent flex items-start gap-3">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="mt-0.5 shrink-0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
             <div>
               <strong class="block mb-1">Gagal mengakses kamera</strong>
@@ -91,14 +91,14 @@
                 Beralih ke mode Unggah File
               </button>
             </div>
-          </div>
-          <div v-if="errorTokenMessage" class="mt-4 p-4 bg-accent/10 border border-accent/20 rounded-lg text-sm text-accent flex items-start gap-3">
+          </div> -->
+          <!-- <div v-if="errorTokenMessage" class="mt-4 p-4 bg-accent/10 border border-accent/20 rounded-lg text-sm text-accent flex items-start gap-3">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="mt-0.5 shrink-0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
             <div>
               <strong class="block mb-1">Autentikasi Token Gagal</strong>
               <span>{{ errorTokenMessage }}</span>
             </div>
-          </div>
+          </div> -->
         </div>
       </div>
     </div>
@@ -119,8 +119,10 @@ const isDecoding = ref(false)
 const isDragging = ref(false)
 const manualToken = ref('')
 
-const errorMessage = ref('')
-const errorTokenMessage = ref('')
+const isProcessingToken = ref(false)
+
+// const errorMessage = ref('')
+// const errorTokenMessage = ref('')
 
 const reader = new BrowserMultiFormatReader()
 let controls = null
@@ -148,7 +150,7 @@ async function startCamera() {
   try {
     const constraints = { video: { facingMode: 'environment' } }
     controls = await reader.decodeFromConstraints(constraints, videoRef.value, (result, err) => {
-      if (result) {
+      if (result && !isProcessingToken.value) {
         hardStopCamera()
         handleToken(result.getText())
       }
@@ -207,6 +209,8 @@ async function handleDrop(event) {
 }
 
 async function decodeImage(file) {
+  if (isProcessingToken.value) return
+
   isDecoding.value = true
   
   const readerInstance = new BrowserMultiFormatReader()
@@ -232,12 +236,20 @@ async function decodeImage(file) {
 }
 
 async function handleToken(token) {
+  if (isProcessingToken.value) return
+  isProcessingToken.value = true
+
   if (token && token.length >= 8) {
     hardStopCamera()
     const isSuccess = await store.verifySessionToken(token)
-    if (!isSuccess) { }
+    if (!isSuccess) {
+      isProcessingToken.value = false 
+      return false
+    }
+    return true
   } else {
     showError('Format token tidak valid. Token harus minimal 8 karakter.')
+    isProcessingToken.value = false 
   }
 }
 

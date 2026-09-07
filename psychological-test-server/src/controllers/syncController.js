@@ -1,5 +1,5 @@
 const db = require('../config/knex');
-const { syncTestSchema, syncSessionSchema } = require('../validators/schemas');
+const { syncTestSchema, syncSessionSchema, getResultSchema } = require('../validators/schemas');
 const logger = require('../utils/logger');
 
 async function syncTest(req, res, next) {
@@ -9,7 +9,7 @@ async function syncTest(req, res, next) {
     const t = parsed.psychological_test;
 
     const existing = await trx('psychological_tests').where({ test_id: t.test_id }).first();
-
+    console.log(t)
     if (existing) {
       await trx('psychological_tests')
         .where({ test_id: t.test_id })
@@ -21,6 +21,8 @@ async function syncTest(req, res, next) {
           time: t.time,
           limit_day: t.limit_day,
           updated_at: db.fn.now(),
+          topic: t.topic,
+          question_count: t.question_count,
         });
     } else {
       await trx('psychological_tests').insert({
@@ -31,6 +33,8 @@ async function syncTest(req, res, next) {
         can_previous: t.can_previous,
         time: t.time,
         limit_day: t.limit_day,
+        topic: t.topic,
+        question_count: t.question_count,
       });
     }
 
@@ -42,7 +46,13 @@ async function syncTest(req, res, next) {
       if (qExist) {
         await trx('question_tests')
           .where({ test_id: q.test_id, question_id: q.question_id })
-          .update({ sequence: q.sequence, title: q.title, updated_at: db.fn.now() });
+          .update({ 
+            sequence: q.sequence, 
+            title: q.title, 
+            type: q.type,
+            dimension_name: q.dimension_name,
+            updated_at: db.fn.now() 
+          });
       } else {
         await trx('question_tests').insert({
           question_id: q.question_id,
@@ -74,7 +84,7 @@ async function syncTest(req, res, next) {
     }
 
     await trx.commit();
-    return res.json({ success: true, message: 'Test synced successfully' });
+    return res.json({ success: true, message: 'Test synced successfully', data: { session_id: "1" } });
   } catch (err) {
     await trx.rollback();
     logger.error('syncTest error:', err.message);
@@ -152,4 +162,75 @@ async function syncSession(req, res, next) {
   }
 }
 
-module.exports = { syncTest, syncSession };
+async function getResult(req, res) {
+  try {
+    const parsed = getResultSchema.parse(req.body);
+    const { token } = parsed;
+
+    const session = await db('psychological_sessions')
+      .where({ token })
+      .first();
+
+    if (!session) {
+      return res.status(404).json({ success: false, message: 'Token tidak valid atau sesi tidak ditemukan' });
+    }
+
+    const sessionTests = await db('psychological_session_tests')
+      .where({ session_id: session.session_id })
+      .orderBy('date', 'asc');
+
+    const sessionAnswers = await db('psychological_session_answers')
+      .where({ session_id: session.session_id });
+
+    const testIds = [...new Set(sessionTests.map(st => st.test_id))];
+    const questionIds = [...new Set(sessionAnswers.map(sa => sa.question_id))];
+    const answerIds = [...new Set(sessionAnswers.map(sa => sa.answer_id).filter(Boolean))];
+
+    const tests = testIds.length ? await db('psychological_tests').whereIn('test_id', testIds) : [];
+    const questions = questionIds.length ? await db('question_tests').whereIn('question_id', questionIds) : [];
+    const answers = answerIds.length ? await db('question_answers').whereIn('answer_id', answerIds) : [];
+
+    const testMap = new Map(tests.map(t => [t.test_id, t]));
+    const questionMap = new Map(questions.map(q => [q.question_id, q]));
+    const answerMap = new Map(answers.map(a => [a.answer_id, a]));
+
+    const groupedAnswers = sessionAnswers.reduce((acc, ans) => {
+      if (!acc[ans.session_test_id]) acc[ans.session_test_id] = [];
+      acc[ans.session_test_id].push({
+        question_id: ans.question_id,
+        question_title: questionMap.get(ans.question_id)?.title || 'Soal tidak ditemukan',
+        answer_id: ans.answer_id,
+        answer_name: ans.answer_id ? (answerMap.get(ans.answer_id)?.name || 'Jawaban tidak ditemukan') : null,
+      });
+      return acc;
+    }, {});
+
+    const resultData = {
+      session_id: session.session_id,
+      applicant_name: session.applicant_name,
+      date: session.date,
+      session_state: session.state,
+      tests: sessionTests.map(st => {
+        const testInfo = testMap.get(st.test_id);
+        return {
+          session_test_id: st.session_test_id,
+          test_id: st.test_id,
+          test_name: testInfo?.name || 'Unknown Test',
+          state: st.state,
+          start_time: st.start_time,
+          limit_time: st.limit_time,
+          end_time: st.end_time,
+          answers: groupedAnswers[st.session_test_id] || []
+        };
+      })
+    };
+
+    return res.json({ success: true, data: resultData });
+
+  } catch (err) {
+    logger.error('getResult error:', err.message);
+    return res.status(400).json({ success: false, message: err.errors?.[0]?.message || err.message });
+  }
+}
+
+module.exports = { syncTest, syncSession, getResult };

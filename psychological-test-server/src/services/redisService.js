@@ -9,7 +9,6 @@ const DRAFT_KEY = (sessionId, sessionTestId) =>
 
 async function setMeta(sessionId, sessionTestId, meta) {
   const key = META_KEY(sessionId, sessionTestId);
-  // expire dalam 24 jam sebagai safety
   await redis.hset(key, {
     session_test_id: String(meta.sessionTestId),
     session_id: String(sessionId),

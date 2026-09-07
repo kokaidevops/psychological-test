@@ -1,10 +1,6 @@
 const crypto = require('crypto');
 const env = require('../config/env');
 
-/**
- * Compute HMAC SHA-256 of `rawBody` combined with timestamp.
- * Signature pattern: HMAC(secret, `${timestamp}.${rawBody}`)
- */
 function computeSignature(timestamp, rawBody) {
   const payload = `${timestamp}.${rawBody}`;
   return crypto

@@ -16,15 +16,10 @@ async function verifyToken(req, res) {
       return res.status(404).json({ success: false, message: 'Invalid token' });
     }
 
-    // Get session_tests for this session
-    const sessionTests = await db('psychological_session_tests')
-      .where({ session_id: session.session_id })
-      .orderBy('date', 'asc');
-
     const tokenPayload = {
-      sessionId: session.session_id,
+      sessionId: session.id,
       applicantName: session.applicant_name,
-      candidateNik: session.token, // or any ID from Odoo
+      token: session.token,
     };
 
     const jwtToken = sign(tokenPayload);
@@ -41,12 +36,11 @@ async function verifyToken(req, res) {
     return res.json({
       success: true,
       data: {
-        session_id: session.session_id,
+        id: session.id,
         name: session.name,
         applicant_name: session.applicant_name,
         date: session.date,
         state: session.state,
-        session_tests: sessionTests,
       },
     });
   } catch (err) {

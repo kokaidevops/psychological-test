@@ -9,7 +9,6 @@ async function start() {
     console.log('[PostgreSQL] connected');
 
     if (redis.status !== 'ready') {
-      // Wait briefly; ioredis auto-reconnects
       console.log('[Redis] waiting for connection...');
     }
 
@@ -22,7 +21,6 @@ async function start() {
   }
 }
 
-// Graceful shutdown
 async function shutdown(signal) {
   console.log(`[Shutdown] received ${signal}`);
   try {

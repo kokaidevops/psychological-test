@@ -23,7 +23,6 @@ app.use(
   })
 );
 
-// Body parser with rawBody capture (needed for HMAC)
 app.use(
   express.json({
     limit: '5mb',
@@ -36,15 +35,12 @@ app.use(
 app.use(cookieParser());
 app.use(globalLimiter);
 
-// Health
 app.get('/health', (_req, res) => res.json({ success: true, status: 'ok' }));
 
-// Routes
 app.use('/api/v1', syncRoutes);
 app.use('/api/v1', authRoutes);
 app.use('/api/v1', candidateRoutes);
 
-// Error handling
 app.use(notFound);
 app.use(errorHandler);
 

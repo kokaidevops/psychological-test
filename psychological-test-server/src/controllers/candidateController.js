@@ -5,6 +5,8 @@ const {
   startSessionSchema,
   saveDraftSchema,
   resumeSessionSchema,
+  getTestSchema,
+  stopSessionSchema
 } = require('../validators/schemas');
 const redisService = require('../services/redisService');
 const logger = require('../utils/logger');
@@ -24,11 +26,10 @@ async function getTests(req, res) {
 
     const sessionTests = await db('psychological_session_tests as pst')
       .leftJoin('psychological_tests as pt', 'pst.test_id', 'pt.test_id')
-      .where('pst.session_id', sessionId)
+      .leftJoin('psychological_sessions as ps', 'pst.session_id', 'ps.session_id')
+      .where('ps.id', sessionId)
       .select(
-        'pst.session_test_id',
-        'pst.session_id',
-        'pst.test_id',
+        'pst.id',
         'pst.date',
         'pst.end_date',
         'pst.time',
@@ -36,12 +37,15 @@ async function getTests(req, res) {
         'pst.limit_time',
         'pst.end_time',
         'pst.state',
-        'pt.name as test_name',
-        'pt.slug as test_slug',
+        'pt.name',
+        'pt.slug',
         'pt.is_publish',
-        'pt.can_previous'
+        'pt.can_previous',
+        'pt.question_count',
+        'pt.topic',
       )
-      .orderBy('pst.date', 'asc');
+      .orderBy('pt.sequence', 'asc')
+      .orderBy('pt.test_id', 'asc');
 
     return res.json({ success: true, data: sessionTests });
   } catch (err) {
@@ -56,10 +60,21 @@ async function startSession(req, res) {
   try {
     const parsed = startSessionSchema.parse(req.body);
     const sessionTestId = parsed.session_test_id;
-    const sessionId = req.userSession.sessionId; // from JWT, Anti-IDOR
+    
+    const parsedToken = parsed.token;
+    const { sessionId, token } = req.userSession;
+    if (parsedToken !== token) {
+      return res.status(403).json({ success: false, message: 'Token mismatch (Anti-IDOR)' });
+    }
 
-    const sessionTest = await trx('psychological_session_tests')
-      .where({ session_test_id: sessionTestId, session_id: sessionId })
+    const sessionTest = await trx('psychological_session_tests as pst')
+      .leftJoin('psychological_tests as pt', 'pst.test_id', 'pt.test_id')
+      .leftJoin('psychological_sessions as ps', 'pst.session_id', 'ps.session_id')
+      .select('pst.*', 'pt.name as test_name')
+      .where({
+        'ps.id': sessionId,
+        'pst.id': sessionTestId
+      })
       .first();
 
     if (!sessionTest) {
@@ -67,18 +82,16 @@ async function startSession(req, res) {
       return res.status(404).json({ success: false, message: 'Session test not found' });
     }
 
-    // If already done, do not allow restart
     if (sessionTest.state === 'done') {
       await trx.rollback();
       return res.status(400).json({ success: false, message: 'Test already finished' });
     }
 
-    // If already in progress and start_time set (resume scenario handled separately)
     const nowUtc = _utcNow();
     const limitUtc = _addMinutes(nowUtc, sessionTest.time || 0);
 
-    await trx('psychological_session_tests')
-      .where({ session_test_id: sessionTestId })
+    await trx('psychological_session_tests as pst')
+      .where({ id: sessionTestId })
       .update({
         state: 'progress',
         start_time: nowUtc,
@@ -88,7 +101,6 @@ async function startSession(req, res) {
 
     await trx.commit();
 
-    // Write meta to Redis
     await redisService.setMeta(sessionId, sessionTestId, {
       sessionTestId,
       startTime: nowUtc.toISOString(),
@@ -96,21 +108,64 @@ async function startSession(req, res) {
       state: 'progress',
     });
 
-    // Fetch questions and answers
     const questions = await db('question_tests')
       .where({ test_id: sessionTest.test_id })
-      .orderBy('sequence', 'asc');
+      .orderBy('sequence', 'asc')
+      .orderBy('question_id', 'asc');
 
     const answers = await db('question_answers')
       .where({ test_id: sessionTest.test_id })
-      .orderBy('sequence', 'asc');
+      .orderBy('sequence', 'asc')
+      .orderBy('answer_id', 'asc');
 
-    // Re-issue JWT including sessionTestId (anti-IDOR for save-draft / stop-session)
+    const groupedQuestions = questions.map(q => {
+      const questionAnswers = answers
+        .filter(a => a.question_id === q.question_id)
+        .map(a => ({
+          answer_id: a.answer_id,
+          sequence: a.sequence,
+          name: a.name
+        }));
+
+      return {
+        id: q.id,
+        session_test_id: sessionTest.test_id,
+        sequence: q.sequence,
+        title: q.title,
+        dimension_name: q.dimension_name,
+        type: q.type,
+        answers: questionAnswers
+      };
+    });
+
+    const sessionTests = await db('psychological_session_tests as pst')
+      .leftJoin('psychological_tests as pt', 'pst.test_id', 'pt.test_id')
+      .leftJoin('psychological_sessions as ps', 'pst.session_id', 'ps.session_id')
+      .where('ps.id', sessionId)
+      .select(
+        'pst.id',
+        'pst.date',
+        'pst.end_date',
+        'pst.time',
+        'pst.start_time',
+        'pst.limit_time',
+        'pst.end_time',
+        'pst.state',
+        'pt.name',
+        'pt.slug',
+        'pt.is_publish',
+        'pt.can_previous',
+        'pt.question_count',
+        'pt.topic',
+      )
+      .orderBy('pt.sequence', 'asc')
+      .orderBy('pt.test_id', 'asc');
+
     const newToken = sign({
       sessionId,
       sessionTestId,
       applicantName: req.userSession.applicantName,
-      candidateNik: req.userSession.candidateNik,
+      token: req.userSession.token,
     });
 
     res.cookie(env.jwt.cookieName, newToken, {
@@ -126,13 +181,15 @@ async function startSession(req, res) {
       success: true,
       data: {
         session_test_id: sessionTestId,
+        test_name: sessionTest.test_name,
         test_id: sessionTest.test_id,
         start_time: nowUtc,
         limit_time: limitUtc,
         time: sessionTest.time,
-        questions,
-        answers,
+        state: sessionTest.state,
+        questions: groupedQuestions,
       },
+      test_data: sessionTests
     });
   } catch (err) {
     await trx.rollback();
@@ -145,7 +202,6 @@ async function startSession(req, res) {
 async function saveDraft(req, res) {
   try {
     const parsed = saveDraftSchema.parse(req.body);
-    // Anti-IDOR: sessionId & sessionTestId come from JWT only
     const { sessionId, sessionTestId } = req.userSession;
     if (!sessionTestId) {
       return res.status(400).json({ success: false, message: 'No active test session' });
@@ -162,22 +218,32 @@ async function saveDraft(req, res) {
 async function stopSession(req, res) {
   const trx = await db.transaction();
   try {
-    // Anti-IDOR: sessionTestId from JWT only
-    const { sessionId, sessionTestId } = req.userSession;
+    const parsed = stopSessionSchema.parse(req.body);
+    const parsedToken = parsed.token;
+    const parsedSessionTestId = parsed.session_test_id;
+    const { sessionId, sessionTestId, token } = req.userSession;
+
     if (!sessionTestId) {
       await trx.rollback();
       return res.status(400).json({ success: false, message: 'No active test session' });
     }
+    if (parsedSessionTestId !== sessionTestId ) {
+      return res.status(403).json({ success: false, message: 'Session mismatch (Anti-IDOR)' });
+    }
+    if (parsedToken !== token) {
+      return res.status(403).json({ success: false, message: 'Token mismatch (Anti-IDOR)' });
+    }
 
-    // Grace period / delay to ensure last draft finished writing to Redis
     await new Promise((r) => setTimeout(r, env.flushDelayMs));
 
-    // Pull all drafts from Redis
     const drafts = await redisService.getAllDrafts(sessionId, sessionTestId); // { questionId: answerId }
 
-    // Fetch the session_test to get test_id
-    const sessionTest = await trx('psychological_session_tests')
-      .where({ session_test_id: sessionTestId, session_id: sessionId })
+    const sessionTest = await trx('psychological_session_tests as pst')
+      .leftJoin('psychological_sessions as ps', 'pst.session_id', 'ps.session_id')
+      .where({
+        'ps.id': sessionId,
+        'pst.id': sessionTestId
+      })
       .first();
 
     if (!sessionTest) {
@@ -185,33 +251,46 @@ async function stopSession(req, res) {
       return res.status(404).json({ success: false, message: 'Session test not found' });
     }
 
-    // Insert/update answers (UPSERT on UNIQUE(session_test_id, question_id))
     for (const [questionId, answerId] of Object.entries(drafts)) {
-      const existing = await trx('psychological_session_answers')
-        .where({ session_test_id: sessionTestId, question_id: Number(questionId) })
+      const existing = await trx('psychological_session_answers as psa')
+        .leftJoin('question_tests as qt', 'qt.question_id', 'psa.question_id')
+        .where({ 
+          'psa.session_test_id': sessionTestId, 
+          'qt.id': questionId 
+        })
         .first();
 
       if (existing) {
         await trx('psychological_session_answers')
-          .where({ session_test_id: sessionTestId, question_id: Number(questionId) })
+          .leftJoin('question_tests as qt', 'qt.question_id', 'psa.question_id')
+          .where({ 
+            'psa.session_test_id': sessionTestId, 
+            'qt.id': questionId 
+          })
           .update({
             answer_id: answerId && answerId !== '' ? Number(answerId) : null,
             updated_at: db.fn.now(),
           });
       } else {
-        await trx('psychological_session_answers').insert({
-          session_id: sessionId,
-          session_test_id: sessionTestId,
-          test_id: sessionTest.test_id,
-          question_id: Number(questionId),
-          answer_id: answerId && answerId !== '' ? Number(answerId) : null,
-        });
+        const question = await db('question_tests')
+          .where({ id: questionId })
+          .first();
+        
+        if(question) {
+          await trx('psychological_session_answers').insert({
+            session_id: sessionId,
+            session_test_id: sessionTestId,
+            test_id: sessionTest.test_id,
+            question_id: question.id,
+            answer_id: answerId && answerId !== '' ? Number(answerId) : null,
+          });
+        }
+
       }
     }
 
-    // Update state to done, set end_time = now UTC
     await trx('psychological_session_tests')
-      .where({ session_test_id: sessionTestId })
+      .where({ id: sessionTestId })
       .update({
         state: 'done',
         end_time: _utcNow(),
@@ -220,14 +299,11 @@ async function stopSession(req, res) {
 
     await trx.commit();
 
-    // Clear Redis keys
     await redisService.clearSession(sessionId, sessionTestId);
-
-    // Clear cookie (issue empty JWT without sessionTestId)
     const clearedToken = sign({
       sessionId,
       applicantName: req.userSession.applicantName,
-      candidateNik: req.userSession.candidateNik,
+      token: req.userSession.token,
     });
 
     res.cookie(env.jwt.cookieName, clearedToken, {
@@ -239,7 +315,34 @@ async function stopSession(req, res) {
       path: '/',
     });
 
-    return res.json({ success: true, message: 'Session stopped and answers committed' });
+    const sessionTests = await db('psychological_session_tests as pst')
+      .leftJoin('psychological_tests as pt', 'pst.test_id', 'pt.test_id')
+      .leftJoin('psychological_sessions as ps', 'pst.session_id', 'ps.session_id')
+      .where('ps.id', sessionId)
+      .select(
+        'pst.id',
+        'pst.date',
+        'pst.end_date',
+        'pst.time',
+        'pst.start_time',
+        'pst.limit_time',
+        'pst.end_time',
+        'pst.state',
+        'pt.name',
+        'pt.slug',
+        'pt.is_publish',
+        'pt.can_previous',
+        'pt.question_count',
+        'pt.topic',
+      )
+      .orderBy('pt.sequence', 'asc')
+      .orderBy('pt.test_id', 'asc');
+
+    return res.json({ 
+      success: true, 
+      message: 'Session stopped and answers committed',
+      data: sessionTests
+    });
   } catch (err) {
     await trx.rollback();
     logger.error('stopSession error:', err.message);
@@ -250,9 +353,21 @@ async function stopSession(req, res) {
 // POST /api/v1/resume-session
 async function resumeSession(req, res) {
   try {
-    const parsed = resumeSessionSchema.parse(req.body);
-    const sessionTestId = parsed.session_test_id;
-    const sessionId = req.userSession.sessionId; // Anti-IDOR
+    const sessionId = req.userSession.sessionId;
+    let sessionTestId;
+
+    if (req.method === 'POST') {
+      const parsed = resumeSessionSchema.parse(req.body);
+      sessionTestId = parsed.session_test_id;
+    } else {
+      sessionTestId = req.userSession.sessionTestId;
+      if (!sessionTestId) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Tidak ada sesi aktif untuk di-resume. Silakan pilih tes dari dashboard.' 
+        });
+      }
+    }
 
     const sessionTest = await db('psychological_session_tests')
       .where({ session_test_id: sessionTestId, session_id: sessionId })
@@ -266,12 +381,11 @@ async function resumeSession(req, res) {
       return res.status(400).json({ success: false, message: 'Test already finished' });
     }
 
-    // Re-issue JWT with sessionTestId (anti-IDOR)
     const newToken = sign({
       sessionId,
       sessionTestId,
       applicantName: req.userSession.applicantName,
-      candidateNik: req.userSession.candidateNik,
+      token: req.userSession.token,
     });
 
     res.cookie(env.jwt.cookieName, newToken, {
@@ -283,10 +397,8 @@ async function resumeSession(req, res) {
       path: '/',
     });
 
-    // Re-create Redis meta if missing (browser crash)
     let meta = await redisService.getMeta(sessionId, sessionTestId);
     if (!meta || !meta.limit_time) {
-      // Fallback to DB start_time / limit_time, do NOT reset timer
       const startTime = sessionTest.start_time || _utcNow();
       const limitTime = sessionTest.limit_time || _addMinutes(new Date(startTime), sessionTest.time || 0);
       await redisService.setMeta(sessionId, sessionTestId, {
@@ -302,11 +414,33 @@ async function resumeSession(req, res) {
 
     const questions = await db('question_tests')
       .where({ test_id: sessionTest.test_id })
-      .orderBy('sequence', 'asc');
+      .orderBy('sequence', 'asc')
+      .orderBy('question_id', 'asc');
 
     const answers = await db('question_answers')
       .where({ test_id: sessionTest.test_id })
-      .orderBy('sequence', 'asc');
+      .orderBy('sequence', 'asc')
+      .orderBy('answer_id', 'asc');
+
+    const groupedQuestions = questions.map(q => {
+      const questionAnswers = answers
+        .filter(a => a.question_id === q.question_id)
+        .map(a => ({
+          answer_id: a.answer_id,
+          sequence: a.sequence,
+          name: a.name
+        }));
+
+      return {
+        id: q.id,
+        session_test_id: sessionTest.test_id,
+        sequence: q.sequence,
+        title: q.title,
+        dimension_name: q.dimension_name,
+        type: q.type,
+        answers: questionAnswers
+      };
+    });
 
     return res.json({
       success: true,
@@ -316,8 +450,7 @@ async function resumeSession(req, res) {
         start_time: meta.start_time,
         limit_time: meta.limit_time,
         remaining_seconds: Math.max(0, Math.floor((new Date(meta.limit_time).getTime() - Date.now()) / 1000)),
-        questions,
-        answers,
+        questions: groupedQuestions,
         drafts, // { questionId: answerId }
       },
     });

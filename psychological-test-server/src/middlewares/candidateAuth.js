@@ -10,12 +10,11 @@ function candidateAuth(req, res, next) {
 
     const decoded = verify(token);
 
-    // Anti-IDOR: IDs come from JWT, NEVER from request body
     req.userSession = {
       sessionId: decoded.sessionId,
-      sessionTestId: decoded.sessionTestId, // optional, set on start-session
+      sessionTestId: decoded.sessionTestId,
       applicantName: decoded.applicantName,
-      candidateNik: decoded.candidateNik,
+      token: decoded.token,
     };
 
     next();

@@ -99,7 +99,7 @@
 		* Fungsi:
 			* Membaca cookie HTTP-Only candidate_session_token.
 			* Memverifikasi JWT menggunakan process.env.JWT_SECRET.
-			* Menempelkan data sesi hasil dekode langsung ke request object (req.userSession = { sessionId: decoded.sessionId, candidateNik: ... }).
+			* Menempelkan data sesi hasil dekode langsung ke request object (req.userSession = { sessionId: decoded.sessionId, token: ... }).
 		* Respon: Mengembalikan 401 Unauthorized jika cookie tidak ada atau JWT kadaluarsa.
 	3) validateSessionTime (Validasi Durasi Timer Server-Side)
 		* Dipasang pada: Endpoint pengerjaan seperti /save-draft.

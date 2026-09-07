@@ -31,7 +31,6 @@
       </div>
     </div>
     
-    <!-- MODE 1: SEMUA SOAL -->
     <div :class="['mode-content', store.mode === 1 && 'active']">
       <div class="mb-6 flex items-center justify-between flex-wrap gap-3 text-sm">
         <div class="text-muted">Gulir untuk melihat seluruh pernyataan. Jawaban tersimpan otomatis.</div>
@@ -44,9 +43,18 @@
           :index="index"
         />
       </div>
+
+      <div class="flex mt-3 justify-end">
+        <button 
+          @click="store.stopSessionTest()" 
+          class="inline-flex items-center gap-2.5 px-5 py-3 text-sm bg-fg text-bg rounded-full hover:bg-accent transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+        >
+          <span>Selesai</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </button>
+      </div>
     </div>
     
-    <!-- MODE 2: SATU SOAL -->
     <div :class="['mode-content', store.mode === 2 && 'active']">
       <SingleQuestionView />
     </div>
@@ -54,9 +62,18 @@
 </template>
 
 <script setup>
+import { ref, onMounted } from 'vue'
 import { useAssessmentStore } from '../stores/assessment'
 import QuestionCard from './QuestionCard.vue'
 import SingleQuestionView from './SingleQuestionView.vue'
 
 const store = useAssessmentStore()
+
+async function refreshPage() {
+  await store.refreshSessionTest()
+}
+
+onMounted(() => {
+  refreshPage()
+})
 </script>

@@ -14,7 +14,6 @@
 
       <div class="lg:col-span-7">
         <div class="bg-card border border-border rounded-2xl p-6 lg:p-8 shadow-sm">
-          <!-- Tabs -->
           <div class="flex gap-2 mb-6 p-1 bg-subtle border border-border rounded-full w-full max-w-xs">
             <button 
               @click="switchMode('scan')"
@@ -32,17 +31,12 @@
             </button>
           </div>
 
-          <!-- Mode 1: Camera Scan -->
           <div v-if="mode === 'scan'" class="space-y-4">
             <div class="relative aspect-video bg-fg rounded-xl overflow-hidden border border-border">
               <video ref="videoRef" class="w-full h-full object-cover" autoplay muted playsinline></video>
-              
-              <!-- Overlay Frame -->
               <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <div class="w-48 h-48 border-2 border-accent rounded-xl shadow-[0_0_0_1000px_rgba(0,0,0,0.4)]"></div>
               </div>
-
-              <!-- Status -->
               <div class="absolute top-3 left-3 bg-bg/80 backdrop-blur px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-2 z-10">
                 <span class="w-1.5 h-1.5 rounded-full bg-accent2 live-dot"></span>
                 <span>{{ isScanning ? 'Mencari barcode...' : 'Kamera mati' }}</span>
@@ -66,7 +60,6 @@
             </div>
           </div>
 
-          <!-- Mode 2: Upload File -->
           <div v-else>
             <label 
               for="barcode-upload" 
@@ -83,14 +76,12 @@
               <span class="text-xs text-muted mt-1">Mendukung format PNG, JPG, JPEG</span>
               <input id="barcode-upload" type="file" accept="image/*" class="hidden" @change="handleFileUpload" />
             </label>
-            
             <div v-if="isDecoding" class="mt-4 text-sm text-muted flex items-center gap-2">
               <svg class="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
               Menganalisis gambar...
             </div>
           </div>
 
-          <!-- Error Message -->
           <div v-if="errorMessage" class="mt-4 p-4 bg-accent/10 border border-accent/20 rounded-lg text-sm text-accent flex items-start gap-3">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="mt-0.5 shrink-0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
             <div>
@@ -101,7 +92,13 @@
               </button>
             </div>
           </div>
-
+          <div v-if="errorTokenMessage" class="mt-4 p-4 bg-accent/10 border border-accent/20 rounded-lg text-sm text-accent flex items-start gap-3">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="mt-0.5 shrink-0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <div>
+              <strong class="block mb-1">Autentikasi Token Gagal</strong>
+              <span>{{ errorTokenMessage }}</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -112,6 +109,7 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { BrowserMultiFormatReader, NotFoundException } from '@zxing/library'
 import { useAssessmentStore } from '@/stores/assessment'
+import { showSuccess, showError, showLoading, closeAlert } from '@/utils/alerts'
 
 const store = useAssessmentStore()
 const mode = ref('scan')
@@ -119,24 +117,24 @@ const videoRef = ref(null)
 const isScanning = ref(false)
 const isDecoding = ref(false)
 const isDragging = ref(false)
-const errorMessage = ref('')
 const manualToken = ref('')
+
+const errorMessage = ref('')
+const errorTokenMessage = ref('')
 
 const reader = new BrowserMultiFormatReader()
 let controls = null
 
-// Fungsi untuk mematikan kamera secara paksa dan menyeluruh
 function hardStopCamera() {
   if (controls) {
     controls.stop()
     controls = null
   }
   
-  // Pastikan stream video dimatikan hingga ke level hardware
   if (videoRef.value && videoRef.value.srcObject) {
     const stream = videoRef.value.srcObject
     const tracks = stream.getTracks()
-    tracks.forEach(track => track.stop()) // Mematikan hardware kamera
+    tracks.forEach(track => track.stop())
     videoRef.value.srcObject = null
   }
   
@@ -144,42 +142,37 @@ function hardStopCamera() {
 }
 
 async function startCamera() {
-  errorMessage.value = ''
-  hardStopCamera() // Bersihkan instance sebelumnya jika ada
+  hardStopCamera()
   isScanning.value = true
 
   try {
-    const constraints = {
-      video: { facingMode: 'environment' }
-    }
-
+    const constraints = { video: { facingMode: 'environment' } }
     controls = await reader.decodeFromConstraints(constraints, videoRef.value, (result, err) => {
       if (result) {
-        // 1. Matikan kamera TERLEBIH DAHULU sebelum state berubah
         hardStopCamera()
-        // 2. Baru kirim token untuk mengganti halaman
         handleToken(result.getText())
       }
       if (err && !(err instanceof NotFoundException)) {
-        console.warn(err)
+        showError(err);
       }
     })
   } catch (err) {
     hardStopCamera()
-    
+    let message = ''
     if (err instanceof DOMException) {
       if (err.name === 'NotAllowedError' || err.name === 'SecurityError') {
-        errorMessage.value = 'Izin kamera ditolak. Silakan berikan izin kamera pada pengaturan browser Anda (klik ikon kamera di address bar).'
+        message = 'Izin kamera ditolak. Silakan berikan izin kamera pada pengaturan browser Anda (klik ikon kamera di address bar).'
       } else if (err.name === 'NotFoundError' || err.name === 'OverconstrainedError') {
-        errorMessage.value = 'Tidak ada kamera yang terdeteksi di perangkat ini. Silakan gunakan fitur Unggah File.'
+        message = 'Tidak ada kamera yang terdeteksi di perangkat ini. Silakan gunakan fitur Unggah File.'
       } else if (err.name === 'NotReadableError') {
-        errorMessage.value = 'Kamera sedang digunakan oleh aplikasi lain. Tutup aplikasi tersebut lalu coba lagi.'
+        message = 'Kamera sedang digunakan oleh aplikasi lain. Tutup aplikasi tersebut lalu coba lagi.'
       } else {
-        errorMessage.value = `Terjadi kesalahan: ${err.message}`
+        message = `Terjadi kesalahan: ${err.message}`
       }
     } else {
-      errorMessage.value = 'Gagal memulai kamera. Pastikan website diakses via HTTPS atau localhost.'
+      message = 'Gagal memulai kamera. Pastikan website diakses via HTTPS atau localhost.'
     }
+    showError(message);
   }
 }
 
@@ -187,7 +180,6 @@ function stopCamera() {
   hardStopCamera()
 }
 
-// Auto-pause jika user berpindah tab atau minimize browser (Menghemat baterai & privasi)
 const handleVisibilityChange = () => {
   if (document.hidden && isScanning.value) {
     hardStopCamera()
@@ -200,10 +192,8 @@ onMounted(() => {
 
 onUnmounted(() => {
   document.removeEventListener('visibilitychange', handleVisibilityChange)
-  hardStopCamera() // Pastikan kamera mati saat komponen dihancurkan
+  hardStopCamera()
 })
-
-// ... (Sisa fungsi upload dan manual input tetap sama persis seperti kode sebelumnya)
 
 async function handleFileUpload(event) {
   const file = event.target.files[0]
@@ -217,7 +207,6 @@ async function handleDrop(event) {
 }
 
 async function decodeImage(file) {
-  errorMessage.value = ''
   isDecoding.value = true
   
   const readerInstance = new BrowserMultiFormatReader()
@@ -229,7 +218,7 @@ async function decodeImage(file) {
       const result = await readerInstance.decodeFromImageElement(img)
       handleToken(result.getText())
     } catch (err) {
-      errorMessage.value = 'Barcode tidak terdeteksi dalam gambar. Pastikan gambar jelas, tidak buram, dan tidak terpotong.'
+      showError('Barcode tidak terdeteksi dalam gambar.', 'Pastikan gambar jelas, tidak buram, dan tidak terpotong.')
     } finally {
       isDecoding.value = false
       URL.revokeObjectURL(img.src)
@@ -237,30 +226,23 @@ async function decodeImage(file) {
   }
   
   img.onerror = () => {
-    errorMessage.value = 'Gagal memuat file gambar. Pastikan format file benar (PNG/JPG).'
+    showError('Gagal memuat file gambar.', 'Pastikan format file benar (PNG/JPG).')
     isDecoding.value = false
   }
 }
 
-function handleToken(token) {
+async function handleToken(token) {
   if (token && token.length >= 8) {
-    store.setSessionToken(token)
+    hardStopCamera()
+    const isSuccess = await store.verifySessionToken(token)
+    if (!isSuccess) { }
   } else {
-    errorMessage.value = 'Format token tidak valid. Token harus minimal 8 karakter.'
-  }
-}
-
-function submitManualToken() {
-  if (manualToken.value.trim().length >= 8) {
-    handleToken(manualToken.value.trim())
-  } else {
-    errorMessage.value = 'Token harus terdiri dari minimal 8 karakter.'
+    showError('Format token tidak valid. Token harus minimal 8 karakter.')
   }
 }
 
 function switchMode(m) {
   mode.value = m
-  errorMessage.value = ''
   if (m === 'upload') hardStopCamera()
 }
 </script>

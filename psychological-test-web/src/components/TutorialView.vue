@@ -34,7 +34,6 @@
       </div>
     </aside>
 
-    <!-- Konten Utama -->
     <div class="lg:col-span-9 max-w-3xl">
       <div class="mb-16">
         <div class="flex items-center gap-3 text-xs text-muted mb-7">

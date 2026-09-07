@@ -1,7 +1,6 @@
 <template>
 	<div>
 		<AssessmentSection />
-		<CallToAction />
 	</div>
 </template>
 

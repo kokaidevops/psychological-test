@@ -304,6 +304,12 @@ export const useAssessmentStore = defineStore('assessment', () => {
     strSessionToken.value = null
     user.value = null
     tests.value = []
+
+    removeStoredData('kokai_session_active')
+    removeStoredData('kokai_session_token')
+    removeStoredData('kokai_session_data')
+    removeStoredData('kokai_user')
+    removeStoredData('kokai_test_data')
   }
 
   function clearTestData() {
@@ -312,6 +318,9 @@ export const useAssessmentStore = defineStore('assessment', () => {
     currentQuestionIndex.value = 0
     answers.value = {}
     flagged.value = []
+
+    removeStoredData('kokai_current_test_id')
+    removeStoredData('kokai_current_test_data')
   }
 
   return {

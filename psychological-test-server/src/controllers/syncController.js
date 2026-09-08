@@ -9,7 +9,6 @@ async function syncTest(req, res, next) {
     const t = parsed.psychological_test;
 
     const existing = await trx('psychological_tests').where({ test_id: t.test_id }).first();
-    console.log(t)
     if (existing) {
       await trx('psychological_tests')
         .where({ test_id: t.test_id })

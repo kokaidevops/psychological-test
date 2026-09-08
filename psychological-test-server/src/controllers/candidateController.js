@@ -27,7 +27,12 @@ async function getTests(req, res) {
     const sessionTests = await db('psychological_session_tests as pst')
       .leftJoin('psychological_tests as pt', 'pst.test_id', 'pt.test_id')
       .leftJoin('psychological_sessions as ps', 'pst.session_id', 'ps.session_id')
-      .where('ps.id', sessionId)
+      .where({
+        'ps.id': sessionId,
+        // 'pst.active': true,
+        // 'pt.active': true,
+        // 'ps.active': true,
+      })
       .select(
         'pst.id',
         'pst.date',
@@ -73,7 +78,10 @@ async function startSession(req, res) {
       .select('pst.*', 'pt.name as test_name')
       .where({
         'ps.id': sessionId,
-        'pst.id': sessionTestId
+        'pst.id': sessionTestId,
+        // 'pst.active': true,
+        // 'ps.active': true,
+        // 'pt.active': true,
       })
       .first();
 
@@ -91,7 +99,10 @@ async function startSession(req, res) {
     const limitUtc = _addMinutes(nowUtc, sessionTest.time || 0);
 
     await trx('psychological_session_tests as pst')
-      .where({ id: sessionTestId })
+      .where({ 
+        id: sessionTestId,
+        // 'pst.active': true,
+      })
       .update({
         state: 'progress',
         start_time: nowUtc,
@@ -108,13 +119,19 @@ async function startSession(req, res) {
       state: 'progress',
     });
 
-    const questions = await db('question_tests')
-      .where({ test_id: sessionTest.test_id })
+    const questions = await db('question_tests as qt')
+      .where({ 
+        // 'qt.active': true,
+        test_id: sessionTest.test_id 
+      })
       .orderBy('sequence', 'asc')
       .orderBy('question_id', 'asc');
 
-    const answers = await db('question_answers')
-      .where({ test_id: sessionTest.test_id })
+    const answers = await db('question_answers as qa')
+      .where({ 
+        // 'qa.active': true,
+        test_id: sessionTest.test_id 
+      })
       .orderBy('sequence', 'asc')
       .orderBy('answer_id', 'asc');
 
@@ -141,7 +158,12 @@ async function startSession(req, res) {
     const sessionTests = await db('psychological_session_tests as pst')
       .leftJoin('psychological_tests as pt', 'pst.test_id', 'pt.test_id')
       .leftJoin('psychological_sessions as ps', 'pst.session_id', 'ps.session_id')
-      .where('ps.id', sessionId)
+      .where({
+        // 'pst.active': true,
+        // 'pt.active': true,
+        // 'ps.active': true,
+        'ps.id': sessionId
+      })
       .select(
         'pst.id',
         'pst.date',
@@ -241,6 +263,8 @@ async function stopSession(req, res) {
     const sessionTest = await trx('psychological_session_tests as pst')
       .leftJoin('psychological_sessions as ps', 'pst.session_id', 'ps.session_id')
       .where({
+        // 'pst.active': true,
+        // 'ps.active': true,
         'ps.id': sessionId,
         'pst.id': sessionTestId
       })
@@ -262,12 +286,16 @@ async function stopSession(req, res) {
         .first();
 
       if (existing) {
-        await trx('psychological_session_answers as psa')
-          .leftJoin('question_tests as qt', 'qt.question_id', 'psa.question_id')
-          .leftJoin('psychological_session_tests as pst', 'pst.test_id', 'psa.test_id')
-          .where({ 
-            'pst.id': sessionTestId, 
-            'qt.id': questionId 
+        await trx('psychological_session_answers')
+          whereIn('id', function () {
+            this.select('psa.id')
+              .from('psychological_session_answers as psa')
+              .leftJoin('question_tests as qt', 'qt.question_id', 'psa.question_id')
+              .leftJoin('psychological_session_tests as pst', 'pst.test_id', 'psa.test_id')
+              .where({
+                'pst.id': sessionTestId,
+                'qt.id': questionId,
+              });
           })
           .update({
             answer_id: answerId && answerId !== '' ? Number(answerId) : null,
@@ -295,8 +323,11 @@ async function stopSession(req, res) {
       }
     }
 
-    await trx('psychological_session_tests')
-      .where({ id: sessionTestId })
+    await trx('psychological_session_tests as pst')
+      .where({ 
+        // 'pst.active': true,
+        id: sessionTestId 
+      })
       .update({
         state: 'done',
         end_time: _utcNow(),
@@ -324,7 +355,12 @@ async function stopSession(req, res) {
     const sessionTests = await db('psychological_session_tests as pst')
       .leftJoin('psychological_tests as pt', 'pst.test_id', 'pt.test_id')
       .leftJoin('psychological_sessions as ps', 'pst.session_id', 'ps.session_id')
-      .where('ps.id', sessionId)
+      .where({
+        // 'pst.active': true,
+        // 'pt.active': true,
+        // 'ps.active': true,
+        'ps.id': sessionId
+      })
       .select(
         'pst.id',
         'pst.date',
@@ -380,6 +416,9 @@ async function resumeSession(req, res) {
       .leftJoin('psychological_sessions as ps', 'pst.session_id', 'ps.session_id')
       .select('pst.*', 'pt.name as test_name')
       .where({
+        // 'pst.active': true,
+        // 'pt.active': true,
+        // 'ps.active': true,
         'ps.id': sessionId,
         'pst.id': sessionTestId
       })
@@ -424,13 +463,19 @@ async function resumeSession(req, res) {
 
     const drafts = await redisService.getAllDrafts(sessionId, sessionTestId);
 
-    const questions = await db('question_tests')
-      .where({ test_id: sessionTest.test_id })
+    const questions = await db('question_tests as qt')
+      .where({ 
+        // 'qt.active': true,
+        test_id: sessionTest.test_id 
+      })
       .orderBy('sequence', 'asc')
       .orderBy('question_id', 'asc');
 
-    const answers = await db('question_answers')
-      .where({ test_id: sessionTest.test_id })
+    const answers = await db('question_answers as qa')
+      .where({ 
+        // 'qa.active': true,
+        test_id: sessionTest.test_id 
+      })
       .orderBy('sequence', 'asc')
       .orderBy('answer_id', 'asc');
 

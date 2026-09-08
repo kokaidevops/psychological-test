@@ -50,18 +50,18 @@
           @click="store.saveDraftAnswers(question.id, opt.answer_id)"
           :class="[
             'py-2 rounded-lg flex flex-col items-center gap-1.5 border border-transparent transition-all',
-            store.answers[question.id] === val && 'bg-accent/5'
+            Number(store.answers[question.id]) === opt.answer_id && 'bg-accent/5'
           ]"
         >
           <span :class="[
             'dot w-4 h-4 rounded-full border-[1.5px] border-border relative transition-all',
-            store.answers[question.id] === val && 'bg-accent border-accent scale-110'
+            Number(store.answers[question.id]) === opt.answer_id && 'bg-accent border-accent scale-110'
           ]">
-            <span v-if="store.answers[question.id] === val" class="absolute inset-1 bg-white rounded-full"></span>
+            <span v-if="Number(store.answers[question.id]) === opt.answer_id" class="absolute inset-1 bg-white rounded-full"></span>
           </span>
           <span :class="[
             'num text-[10px] transition-colors',
-            store.answers[question.id] === val ? 'text-accent font-semibold' : 'text-muted'
+            Number(store.answers[question.id]) === opt.answer_id ? 'text-accent font-semibold' : 'text-muted'
           ]">{{ opt.name }}</span>
         </button>
 
@@ -84,16 +84,16 @@
         @click="store.saveDraftAnswers(question.id, opt.answer_id)"
         :class="[
           'w-full text-left p-3.5 rounded-xl border flex items-center gap-3 transition-all',
-          store.answers[question.id] === opt.answer_id 
+          Number(store.answers[question.id]) === opt.answer_id 
             ? 'border-accent bg-accent/5 text-fg' 
             : 'border-border text-muted hover:border-fg hover:bg-subtle'
         ]"
       >
         <span :class="[
           'w-5 h-5 rounded-full border-2 shrink-0 flex items-center justify-center transition-all',
-          store.answers[question.id] === opt.answer_id ? 'border-accent bg-accent' : 'border-border'
+          Number(store.answers[question.id]) === opt.answer_id ? 'border-accent bg-accent' : 'border-border'
         ]">
-          <span v-if="store.answers[question.id] === opt.answer_id" class="w-2 h-2 bg-white rounded-full"></span>
+          <span v-if="Number(store.answers[question.id]) === opt.answer_id" class="w-2 h-2 bg-white rounded-full"></span>
         </span>
         <span class="text-sm font-medium">{{ opt.name }}</span>
       </button>

@@ -198,11 +198,22 @@ import { useAssessmentStore } from '../stores/assessment'
 const store = useAssessmentStore()
 const router = useRouter()
 
+function handleGlobalKey(event) {
+  if (event.altKey && event.key.toLowerCase() === 'n') {
+    store.nextQuestion()
+  }
+  if (event.altKey && event.key.toLowerCase() === 'k') {
+    store.prevQuestion()
+  }
+}
+
 onMounted(() => {
   window.addEventListener('online', handleOnline);
+  window.addEventListener('keydown', handleGlobalKey);
 });
 onUnmounted(() => {
   window.removeEventListener('online', handleOnline);
+  window.removeEventListener('keydown', handleGlobalKey);
 });
 
 async function stopSessionTest() {

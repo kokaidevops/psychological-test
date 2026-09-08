@@ -287,7 +287,7 @@ async function stopSession(req, res) {
 
       if (existing) {
         await trx('psychological_session_answers')
-          whereIn('id', function () {
+          .whereIn('id', function () {
             this.select('psa.id')
               .from('psychological_session_answers as psa')
               .leftJoin('question_tests as qt', 'qt.question_id', 'psa.question_id')

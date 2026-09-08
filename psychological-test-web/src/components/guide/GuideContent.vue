@@ -43,7 +43,7 @@
           <span class="font-display text-2xl text-accent section-num">02</span>
           <div>
             <h4 class="font-medium mb-1">Mode Satu Soal</h4>
-            <p class="text-sm text-muted leading-relaxed">Fokus pada satu pertanyaan dalam satu waktu, dilengkapi dengan navigasi nomor soal. Sangat ideal untuk meminimalkan distraksi.</p>
+            <p class="text-sm text-muted leading-relaxed">Fokus pada satu pertanyaan dalam satu waktu, dilengkapi dengan navigasi nomor soal. Sangat ideal untuk meminimalkan distraksi. Dalam mode ini, jika menggunakan device yang memiliki keyboard (baik internal maupun eksternal, gunakan `Alt+N` untuk ke soal berikutnya atau `Alt+K` untuk ke soal sebelumnya)</p>
           </div>
         </div>
       </div>

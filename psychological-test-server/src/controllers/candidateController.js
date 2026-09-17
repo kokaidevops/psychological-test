@@ -269,10 +269,7 @@ async function stopSession(req, res) {
         'pst.id': sessionTestId
       })
       .first();
-    console.log("==========================");
-    console.log(sessionTest);
-    console.log(sessionTestId);
-    console.log("==========================");
+
     if (!sessionTest) {
       await trx.rollback();
       return res.status(404).json({ success: false, message: 'Session test not found' });
@@ -287,10 +284,6 @@ async function stopSession(req, res) {
         'qt.id': questionId 
       })
       .first();
-      console.log("questionId: ");
-      console.log(questionId);
-      console.log("existing: ");
-      console.log(existing);
 
       if (existing) {
         await trx('psychological_session_answers')
@@ -312,16 +305,13 @@ async function stopSession(req, res) {
         const question = await db('question_tests')
           .where({ id: questionId })
           .first();
-        console.log("question: ");
-        console.log(question);
         
         if(question) {
           const session = await db('psychological_session_tests as pst')
             .where({ 'pst.id': sessionTestId })
             .select('pst.session_id', 'pst.session_test_id')
             .first()
-          console.log("session: ");
-          console.log(session);
+
           await trx('psychological_session_answers').insert({
             session_id: session.session_id,
             session_test_id: session.session_test_id,

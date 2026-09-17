@@ -281,7 +281,7 @@ async function stopSession(req, res) {
     for (const [questionId, answerId] of Object.entries(drafts)) {
       const existing = await trx('psychological_session_answers as psa')
       .leftJoin('question_tests as qt', 'qt.question_id', 'psa.question_id')
-      .leftJoin('psychological_session_tests as pst', 'pst.test_id', 'psa.test_id')
+      .leftJoin('psychological_session_tests as pst', 'pst.session_test_id', 'psa.session_test_id')
       .where({ 
         'pst.id': sessionTestId, 
         'qt.id': questionId 
@@ -298,7 +298,7 @@ async function stopSession(req, res) {
             this.select('psa.id')
               .from('psychological_session_answers as psa')
               .leftJoin('question_tests as qt', 'qt.question_id', 'psa.question_id')
-              .leftJoin('psychological_session_tests as pst', 'pst.test_id', 'psa.test_id')
+              .leftJoin('psychological_session_tests as pst', 'pst.session_test_id', 'psa.session_test_id')
               .where({
                 'pst.id': sessionTestId,
                 'qt.id': questionId,
